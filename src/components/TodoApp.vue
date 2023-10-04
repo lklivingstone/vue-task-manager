@@ -196,25 +196,24 @@ export default {
       event.preventDefault();
       const dropIndex = this.draggedItemIndex;
       if (dropIndex !== null) {
+        // const taskToDelete = this.tasks[dropIndex];
+        const deleteItemStatus = this.tasks[dropIndex]['status'];
+        
         this.tasks.splice(dropIndex, 1);
         this.draggedItemIndex = null;
         this.isBottomDivVisible = false; 
+
+        const remainingTasks = this.tasks.find(task => task.status === deleteItemStatus);
+
+        if (!remainingTasks) {
+          this.filter = '';
+          console.log("yo")
+        }
       }
     },
     endDrag() {
       this.isBottomDivVisible = false;
-    },
-    changeTaskStatus(id) {
-      const taskToUpdate = this.tasks.find(task => task.id === id);
-      if (taskToUpdate) {
-        if (taskToUpdate.status === 'complete') {
-          taskToUpdate.status = 'incomplete';
-        }
-        else {
-          taskToUpdate.status = 'complete';
-        }
-      }
-    },
+    }
   },
 };
 </script>
