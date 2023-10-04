@@ -164,7 +164,7 @@ export default {
     addTask() {
       if (this.task.length !== 0 && this.status.length !== 0) {
         this.tasks.push({
-          id: this.tasks[this.tasks.length-1]["id"] + 1,
+          id: this.tasks.length > 0 ? this.tasks[this.tasks.length-1]["id"] + 1 : 0,
           name: this.task,
           status: this.status
         })
