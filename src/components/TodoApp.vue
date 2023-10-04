@@ -8,42 +8,66 @@
           <h1>Tasks</h1>
         </div>
         <div class="task-input-div">
-          <input v-model="task" class="task-input" placeholder="Add tasks..." @keyup.enter="addTask" />
+          <input v-model="task" class="task-input" placeholder="Add tasks..." />
+           <input v-model="status" class="status-input" placeholder="Mention the status" @keyup.enter="addTask" />
           <button @click="addTask" class="task-input-button">Add</button>
         </div>
       </div>
       
       <div class="notes-list">
         <div class="filter-buttons">
-          <button class="filter-button" :class="{ 'active-filter': filter === 'all'}" @click="setFilter('all')">All</button>
-          <button class="filter-button" :class="{ 'active-filter': filter === 'complete'}" @click="setFilter('complete')">Complete</button>
-          <button class="filter-button" :class="{ 'active-filter': filter === 'incomplete'}" @click="setFilter('incomplete')">Incomplete</button>
+          <h3>Filter: </h3>
+          <select 
+          name="filters"
+          v-model="filter"
+          @change="onChange($event.target.value)"
+          class="filters-select"
+          >
+            <option value="">All</option>
+            <option v-for="(status, index) in uniqueStatuses"
+            :key="index"
+            :value="status"
+            >
+            {{status}}
+            </option>
+          </select>
         </div>
         <div class="notes-list-scroll-container">
           <div
           v-for="(task, index) in filteredTasks"          
           :key="index"
-          :class="getTaskClass(task.status)"          
+          class="list-item"          
           draggable="true"
           @dragstart="startDrag(index, $event)"
           @dragend="endDrag"
           @mouseenter="hoveredItemIndex = index"
           @mouseleave="hoveredItemIndex = null"
           >
-            <h3>{{ task.name }}</h3>
-            
-            <font-awesome-icon
-              v-if="hoveredItemIndex === index && task.status === 'complete'"
-              icon="hourglass-half"
-              style="color: #d6d1d1; cursor: pointer;"
-              @click="changeTaskStatus(task.id)"
-            />
-            <font-awesome-icon
-              v-if="hoveredItemIndex === index && task.status === 'incomplete'"
-              icon="check"
-              style="color: #d6d1d1; cursor: pointer;"
-              @click="changeTaskStatus(task.id)"
-            />     
+            <div
+            class="list-item-text"
+            >
+              <h3>{{ task.name }} - {{ task.status }}</h3>
+              <font-awesome-icon icon="pen-to-square" 
+                style="color: #d6d1d1; cursor: pointer;"
+                @click="editTask(task.id)"/>
+            </div>
+            <div
+              class="list-item-input"
+            >
+              <input 
+              v-if="isEditing(task.id)"
+              v-model="updateStatus"
+              class="status-input"
+              placeholder="Mention the status"
+              @keyup.enter="updateTask(task.id)"
+              />
+              <button 
+              v-if="isEditing(task.id)"
+              @click="updateTask(task.id)"
+              class="task-input-button"
+              >Update</button>
+            </div>
+
           </div>
           <div class="empty-space"></div>
         </div>
@@ -71,9 +95,12 @@
 import "../styles/customScrollbar.css";
 
 export default {
+  
   data() {
     return {
       task: '',
+      status: '',
+      updateStatus : '',
       tasks: [
         {
           id: 1,
@@ -89,15 +116,10 @@ export default {
           id: 3,
           name: "task 3",
           status: 'complete'
-        },
-        {
-          id: 4,
-          name: "task 4",
-          status: 'incomplete'
         }
-        
       ],
-      filter: 'all',
+      filter: '',
+      editingIndex: -1,
       isInstructionDivVisible: true,
       draggedItemIndex: null,
       isBottomDivVisible: false,
@@ -105,32 +127,61 @@ export default {
     };
   },
   computed: {
+    uniqueStatuses() {
+      // Use a Set to store unique status values
+      const uniqueStatusesSet = new Set();
+      
+      // Iterate through the tasks and add unique status values to the Set
+      this.tasks.forEach(task => {
+        uniqueStatusesSet.add(task.status);
+      });
+      
+      // Convert the Set back to an array and return it
+      return Array.from(uniqueStatusesSet);
+    },
     filteredTasks() {
-      if (this.filter === 'all') {
-        return this.tasks;
-      } else if (this.filter === 'complete') {
-        return this.tasks.filter(task => task.status === 'complete');
-      } else if (this.filter === 'incomplete') {
-        return this.tasks.filter(task => task.status === 'incomplete');
+      if (this.filter === '') {
+        return this.tasks
       }
-      return [];
+      return this.tasks.filter(task => task.status === this.filter);
     },
   },
   methods: {
+    onChange:function(val) {
+      this.filter = val;
+    },
+    isEditing(index) {
+      return this.editingIndex === index;
+    },
+    editTask(index) {
+      if (this.editingIndex !== -1 && this.editingIndex === index) {
+        this.editingIndex = -1;
+      }
+      else {
+        this.editingIndex = index;
+      }
+    },
     addTask() {
-      if (this.task.length !== 0) {
+      if (this.task.length !== 0 && this.status.length !== 0) {
         this.tasks.push({
-          id: this.tasks.length,
+          id: this.tasks.length + 1,
           name: this.task,
-          status: 'incomplete'
+          status: this.status
         })
+        this.status = ''
         this.task = ''
       }
     },
-    getTaskClass(status) {
-      return status === 'incomplete' ? 'red-list-item' : 'green-list-item';
+    updateTask(id) {
+      const taskToUpdate = this.tasks.find(task => task.id === id);
+      if (taskToUpdate) {
+        taskToUpdate.status = this.updateStatus;
+      }
+      this.updateStatus = '';
+      this.filter = taskToUpdate.status;
     },
     setFilter(newFilter) {
+      console.log(newFilter)
       this.filter = newFilter;
     },
     closeDeleteInstructions() {
@@ -139,7 +190,7 @@ export default {
     startDrag(index, event) {
       this.draggedItemIndex = index;
       event.dataTransfer.setData('text/plain', index);
-      this.isBottomDivVisible = true; // Show the bottom div when drag starts
+      this.isBottomDivVisible = true; 
     },
     removeItem(event) {
       event.preventDefault();
@@ -147,7 +198,7 @@ export default {
       if (dropIndex !== null) {
         this.tasks.splice(dropIndex, 1);
         this.draggedItemIndex = null;
-        this.isBottomDivVisible = false; // Hide the bottom div after item removal
+        this.isBottomDivVisible = false; 
       }
     },
     endDrag() {
@@ -155,7 +206,6 @@ export default {
     },
     changeTaskStatus(id) {
       const taskToUpdate = this.tasks.find(task => task.id === id);
-      // Update the task status when the icon is clicked
       if (taskToUpdate) {
         if (taskToUpdate.status === 'complete') {
           taskToUpdate.status = 'incomplete';
@@ -169,7 +219,6 @@ export default {
 };
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
 .app {
   width: 100%;
@@ -211,10 +260,20 @@ export default {
 }
 
 .task-input {
-  width: 100%;
+  flex: 4;
   height: 30px;
   background-color: #383a3f;
-  border: none;
+  border: #212225;
+  margin-right: 2px;
+  padding: 5px;
+  color: #d6d1d1;
+}
+
+.status-input {
+  flex: 1;
+  height: 30px;
+  background-color: #383a3f;
+  border: 1px #212225;
   padding: 5px;
   color: #d6d1d1;
 }
@@ -231,7 +290,7 @@ export default {
   flex: 5;
   padding: 0px;
   margin: 10px;
-  overflow: hidden; /* Hide the vertical overflow from the outer container */
+  overflow: hidden; 
 }
 
 .filter-buttons {
@@ -253,72 +312,52 @@ export default {
   border: 3px solid #f68657;
 }
 
+.filters-select {
+  height: 30px;
+  background-color: #383a3f;
+  border: 1px solid #212225; /* Added border style */
+  margin-right: 2px;
+  padding: 5px;
+  color: #d6d1d1;
+}
+
 .notes-list-scroll-container {
   width: 100%;
-  height: 100%; /* Expand to fill the height of the .notes-list container */
-  overflow-y: scroll; /* Enable scrolling for this container */
+  height: 100%;
+  overflow-y: scroll; 
 }
 
-.green-list-item {
-  border-left: 5px solid transparent; /* Transparent left border */
-  border-right: 5px solid transparent; /* Transparent right border */
-  border-top: 1px solid transparent; /* Transparent top border */
-  border-bottom: 1px solid transparent; /* Transparent bottom border */
-  border-image: linear-gradient(to right, rgb(108, 232, 86), transparent) 1 100%; /* Gradient border */
-  border-image-slice: 1; /* Ensure the entire border is used as an image */
+.list-item {
   margin: 12px;
   padding: 8px 16px;
   transition: all 0.2s ease-in-out;
-  background: #1f2124; /* Transparent background */
+  background: #1f2124; 
+  display: flex;
+  align-items: center;
+  /* justify-content: space-between; */
+  flex-direction: column;
+}
+
+.list-item:hover {
+  margin: 12px;
+  padding: 8px 16px;
+  transition: all 0.2s ease-in-out;
+  background: #1f2124; 
+  display: flex;
+}
+
+.list-item-input {
+  width: 80%;
+  display: flex;
+  align-items: center;
+}
+
+.list-item-text {
+  width: 100%;
+  margin-bottom: 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.green-list-item:hover {
-  /* Change the gradient border from left to right when hovering */
-  border-image: linear-gradient(to right, transparent, rgb(108, 232, 86)) 1 100%;
-  border-left: 5px solid transparent; /* Transparent left border */
-  border-right: 5px solid transparent; /* Transparent right border */
-  border-top: 1px solid transparent; /* Transparent top border */
-  border-bottom: 1px solid transparent; /* Transparent bottom border */
-  border-image-slice: 1; /* Ensure the entire border is used as an image */
-  margin: 12px;
-  padding: 8px 16px;
-  transition: all 0.2s ease-in-out;
-  background: #1f2124; /* Transparent background */
-  display: flex;
-}
-
-.red-list-item {
-  border-left: 5px solid transparent; /* Transparent left border */
-  border-right: 5px solid transparent; /* Transparent right border */
-  border-top: 1px solid transparent; /* Transparent top border */
-  border-bottom: 1px solid transparent; /* Transparent bottom border */
-  border-image: linear-gradient(to right, rgb(255, 56, 56), transparent) 1 100%; /* Gradient border */
-  border-image-slice: 1; /* Ensure the entire border is used as an image */
-  margin: 12px;
-  padding: 8px 16px;
-  transition: all 0.2s ease-in-out;
-  background: #1f2124; /* Transparent background */
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.red-list-item:hover {
-  /* Change the gradient border from left to right when hovering */
-  border-image: linear-gradient(to right, transparent, rgb(255, 56, 56)) 1 100%;
-  border-left: 5px solid transparent; /* Transparent left border */
-  border-right: 5px solid transparent; /* Transparent right border */
-  border-top: 1px solid transparent; /* Transparent top border */
-  border-bottom: 1px solid transparent; /* Transparent bottom border */
-  border-image-slice: 1; /* Ensure the entire border is used as an image */
-  margin: 12px;
-  padding: 8px 16px;
-  transition: all 0.2s ease-in-out;
-  background: #1f2124; /* Transparent background */
-  display: flex;
 }
 
 .empty-space {
@@ -335,12 +374,12 @@ export default {
   width: 100%;
   height: 50px;
   background: linear-gradient(to top, rgba(255, 50, 50, 1), rgba(255, 50, 50, 0)); /* Gradient from bottom to top */
-  opacity: 0; /* Initially hidden */
-  transition: opacity 0.3s; /* Smooth opacity transition */
+  opacity: 0;
+  transition: opacity 0.3s;
 }
 
 .visible {
-  opacity: 1; /* Show the bottom div */
+  opacity: 1; 
 }
 
 .delete-instructions {
@@ -360,13 +399,6 @@ export default {
 .delete-message {
   flex-grow: 1;
   padding-right: 10px;
-}
-
-/* Style for the close button */
-.close-button {
-  background: none;
-  border: none;
-  cursor: pointer;
 }
 
 </style>
